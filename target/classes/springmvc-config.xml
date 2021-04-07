@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:mvc="http://www.springframework.org/schema/mvc"
+    xmlns:p="http://www.springframework.org/schema/p"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/mvc
+        http://www.springframework.org/schema/mvc/spring-mvc.xsd">
+
+	<!--包扫描；开启SpringMVC提供注解支持-->
+	<context:component-scan base-package="cn.smbms.controller"/>
+	<!--mvc:annotation-driven是为了让Spring MVC用的，
+	供Controller请求转发，json自动转换等功能。
+	它会自动注册RequestMappingHandlerMapping与
+	RequestMappingHandlerAdapter两个Bean,
+	这是Spring MVC为@Controller分发请求所必需的，
+	并且提供了数据绑定支持，
+	@NumberFormatannotation支持，
+	@DateTimeFormat支持,
+	@Valid支持读写XML的支持（JAXB）和读写JSON的支持（默认Jackson）等功能。
+	注：JAXB代表用于XML绑定的Java体系结构。它用于将XML转换为java对象，
+	并将java对象转换为XML。JAXB定义了一个用于在XML文档中读写Java对象的API。
+	mvc:message-converters消息转换器标签，可以设定字符集和json处理类。
+	如果不写mvc:message-converters标签，Spring会默认注册一些默认的消息转换器；
+	若写了该标签，Spring就不会默认注册。
+	-->
+	<!-- 注入fastjson配置类 -->
+	<bean name="fastJsonConfig"
+		  class="com.alibaba.fastjson.support.config.FastJsonConfig">
+		<property name="serializerFeatures">
+			<list>
+				<!--是否输出值为null的字段 ，默认是false。配置后就不再默认。-->
+				<!--WriteNullListAsEmpty  ：List字段如果为null,输出为[],而非null；
+				WriteNullStringAsEmpty ： 字符类型字段如果为null,输出为"",而非null；
+				DisableCircularReferenceDetect ：消除对同一对象循环引用的问题，默认为false（如果不配置有可能会进入死循环）。
+				WriteNullBooleanAsFalse：Boolean字段如果为null,输出为false,而非null。
+				WriteMapNullValue：是否输出值为null的字段,默认为false。-->
+				<value>WriteMapNullValue</value>
+				<value>WriteNullNumberAsZero</value>
+				<value>WriteNullListAsEmpty</value>
+				<value>WriteNullStringAsEmpty</value>
+				<value>WriteNullBooleanAsFalse</value>
+				<value>DisableCircularReferenceDetect</value>
+				<!--   Date的日期转换器 -->
+				<value>WriteDateUseDateFormat</value>
+			</list>
+		</property>
+	</bean>
+	<!--自定义日期型字符串与Date数据转换器-->
+	<bean id="myConversionService" class="org.springframework.context.support.ConversionServiceFactoryBean">
+		<property name="converters">
+			<list>
+				<bean class="cn.smbms.tools.StringToDateConverter">
+					<constructor-arg type="java.lang.String" value="yyyy-MM-dd"/>
+				</bean>
+			</list>
+		</property>
+	</bean>
+	<!--将上述myConversionService设置为默认的转换服务-->
+	<mvc:annotation-driven conversion-service="myConversionService">
+		<mvc:message-converters>
+			<!--StringHttpMessageConverter通过设置，
+			可以避免Controller返回的字符串是乱码。-->
+			<bean class="org.springframework.http.converter.StringHttpMessageConverter">
+				<!--supportedMediaTypes配置的是StringHttpMessageConverter
+				响应给客户端的Content-Type内容类型。-->
+				<property name="supportedMediaTypes">
+					<list>
+						<value>application/json;charset=UTF-8</value>
+					</list>
+				</property>
+			</bean>
+			<!--处理JSON转换时的中文乱码-->
+			<bean class="com.alibaba.fastjson.support.spring.FastJsonHttpMessageConverter">
+				<property name="supportedMediaTypes">
+					<list>
+						<!-- 这里顺序不能写反，一定要先写text/html，否则IE下会出现下载提示 -->
+						<value>text/html;charset=UTF-8</value>
+						<value>application/json;charset=UTF-8</value>
+					</list>
+				</property>
+				<!-- 配置特性，替代过时的features属性配置。 -->
+				<property name="fastJsonConfig" ref="fastJsonConfig"/>
+			</bean>
+		</mvc:message-converters>
+	</mvc:annotation-driven>
+
+	<!--放行静态资源-->
+	<mvc:resources mapping="/calendar/**" location="/calendar/"/>
+	<mvc:resources mapping="/css/**" location="/css/"/>
+	<mvc:resources mapping="/images/**" location="/images/"/>
+	<mvc:resources mapping="/js/**" location="/js/"/>
+	<mvc:resources mapping="/statics/**" location="/statics/"/>
+
+	<!-- ContentNegotiatingViewResolver视图解析器允许用同样的内容数据来呈现不同的view，
+	根据客户端的不同的请求决定不同的view进行响应,
+	如 /blog/1.json返回json格式数据 /blog/1.html返回html格式数据.
+	需要用到@ResponseBody，以表示Controller的返回值会绑定在响应体中，
+	并将其转换为客户端请求的表述形式.
+		-->
+	<bean id="cnManager" class="org.springframework.web.accept.ContentNegotiationManagerFactoryBean">
+		<!--默认为true，表示支持参数匹配，可以根据请求参数的值确定MIME类型，
+		默认的请求参数为format，如： /user/view?id=12&format=json-->
+		<property name="favorParameter" value="true"/>
+		<!-- 设置为true以忽略对Accept Header的支持.
+		 Accept Header根据请求头Accept来协商。-->
+		<property name="ignoreAcceptHeader" value="true" />
+		<!-- 在没有扩展名时即: "/user/1" 时的默认展现形式 -->
+		<property name="defaultContentType" value="text/html" />
+		<!-- 根据请求参数值和MIME类型的映射列表,
+		扩展名至mimeType的映射,即 /user.json => application/json -->
+		<property name="mediaTypes">
+			<map>
+				<entry key="html" value="text/html;charset=UTF-8"/>
+				<entry key="json" value="application/json;charset=UTF-8" />
+			</map>
+		</property>
+	</bean>
+	<bean
+			class="org.springframework.web.servlet.view.ContentNegotiatingViewResolver">
+		<property name="contentNegotiationManager" ref="cnManager"/>
+		<property name="viewResolvers">
+			<list>
+				<bean
+						class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+					<property name="prefix" value="/" />
+					<property name="suffix" value=".jsp"></property>
+				</bean>
+			</list>
+		</property>
+	</bean>
+
+	<!-- 配置拦截器interceptors -->
+	<mvc:interceptors>
+		<mvc:interceptor>
+			<mvc:mapping path="/jsp/*"/>
+			<mvc:exclude-mapping path="/jsp/user/*"/>
+			<!--SpringMVC拦截器只拦截controller,不拦截jsp文件-->
+			<bean class="cn.smbms.interceptor.SysInterceptor"/>
+		</mvc:interceptor>
+	</mvc:interceptors>
+
+	<!--全局异常处理-->
+	<bean class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+		<property name="exceptionMappings">
+			<props>
+				<!--异常类及异常跳转的逻辑视图名-->
+				<prop key="java.lang.RuntimeException">error</prop>
+			</props>
+		</property>
+	</bean>
+
+	<!-- 配置MultipartResolver，用于上传文件，使用spring的CommonsMultipartResolver -->
+	<bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+		<!--上传字节的最大数量，单位字节-->
+		<property name="maxUploadSize" value="5000000000"/>
+		<property name="defaultEncoding" value="UTF-8"/>
+	</bean>
+
+	<!--测试注册bean到处理器的映射-->
+	<bean name="/test/test.bean" class="cn.smbms.controller.TestBeanController"/>
+
+</beans>
