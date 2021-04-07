@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * <h3>项目名称:smbms3</h3>
- * <p>本API描述:</p>
+ * <p>本API描述:测试用的控制器</p>
  * <p>@author : LiZhangyong</p>
  * <p>@date : 2021-04-07 08:35</p>
  **/
